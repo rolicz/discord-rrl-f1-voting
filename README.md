@@ -9,10 +9,11 @@ Each day at 15:00, the bot counts the reactions and posts a chart to the channel
 Install requirements.
 
 ### Start
-`python3 voting-f1.py -t TOKEN -g GUILD_ID -c CHANNEL_ID -r MIN_NUM_RACERS`
+`python3 voting-f1.py -t TOKEN -g GUILD_ID -c CHANNEL_ID -r ROLE_ID -m MIN_NUM_RACERS`
 - `TOKEN`: bot token
 - `GUILD_ID`: server id
 - `CHANNEL_ID`: channel id
+- `ROLE_ID`: role id to be pinged
 - `MIN_NUM_RACERS`: min number of racers for race to start
 - `-d` (optional): debug logging
 

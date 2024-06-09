@@ -20,7 +20,8 @@ parser.add_argument("-d", "--debug", action=argparse.BooleanOptionalAction)
 parser.add_argument("-t", "--token", dest="token", required=True)
 parser.add_argument("-g", "--guild-id", dest="guild_id", required=True, type=int)
 parser.add_argument("-c", "--channel-id", dest="channel_id", required=True, type=int)
-parser.add_argument("-r", "--min-num-racers", dest="min_num_racers", required=True, type=int)
+parser.add_argument("-r", "--role-id", dest="role_id", required=True, type=int)
+parser.add_argument("-m", "--min-num-racers", dest="min_num_racers", required=True, type=int)
 args = parser.parse_args(sys.argv[1:])
 
 if args.debug != None and args.debug is True:
@@ -36,10 +37,14 @@ TOKEN = args.token
 MIN_NUM_RACERS = args.min_num_racers
 GUILD_ID = args.guild_id
 CHANNEL_ID = args.channel_id 
+ROLE_ID = args.role_id 
+VOTING_CLOSED_HOUR="15:00"
+
 logging.info(f"min racers: {MIN_NUM_RACERS}")
 logging.info(f"token     : {TOKEN}")
 logging.info(f"guild_id  : {GUILD_ID}")
 logging.info(f"channel_id: {CHANNEL_ID}")
+logging.info(f"role_id   : {ROLE_ID}")
 
 
 #EMOJI_TIMESLOTS = {'🕕': '18:00', '🕖': '19:00', '🕗': '20:00'} 
@@ -159,7 +164,27 @@ async def post_weekdays(channel, week_number):
     start_date = first_day_of_year + timedelta(weeks=week_number-1)
     weekdays = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 
-    await channel.send(f'@RRL KW {week_number}')
+    await channel.send(f"<@&{ROLE_ID}>")
+    # send info message
+    embed = discord.Embed(
+        title=f"KW {week_number}",
+        description="Bitte reagiert auf die Tage, an denen ihr an einem Rennen teilnehmen könnt.",
+        color=discord.Color.blue(),
+    )
+    embed.add_field(
+        name=f":white_check_mark: {VOTING_CLOSED_HOUR} Uhr und {MIN_NUM_RACERS} Teilnehmer",
+        value="",
+        inline=False,
+    )
+    embed.add_field(name="Die Zeiten sind wie folgt:", value="", inline=False)
+    
+    # append the possible time emojis
+    for key, value in EMOJI_TIMESLOTS.items():
+        embed.add_field(name=f"{key} - {value}\n", value="", inline=False)
+    
+    await channel.send(embed=embed)
+
+
 
     for i in range(7):
         day_date = start_date + timedelta(days=i)
@@ -193,7 +218,6 @@ async def count_reactions_and_generate_charts():
         'Sunday': 'Sonntag'
     }
     today_name_german = day_translations[today_name]
-
     if today_name_german in message_ids:
         msg_id = message_ids[today_name_german]
         try:
@@ -217,14 +241,14 @@ def generate_barchart(day_name, reaction_counts):
     max_count = max(user_counts.values()) if user_counts else 1
 
     # Create bar chart image using Pillow
-    width = len(timeslots * 100)
+    bar_spacing = 10
+    width = len(timeslots * 100) + bar_spacing
     height = max_count * 30 + 100
     bar_width = 90
-    bar_spacing = 10
     block_height = 25 # Height of each user block
     vertical_spacing = 5 
 
-    image = Image.new('RGB', (width, height), 'white')
+    image = Image.new('RGB', (width, height), (210,210,210))
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
 
