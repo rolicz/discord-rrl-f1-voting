@@ -228,7 +228,7 @@ async def daily_task():
         now = datetime.now()
 
         # start new voting every sunday evening
-        if now.weekday() == 6 and now.hour == 22 and now.minute == 0:
+        if now.weekday() == 6 and now.hour == 22 and now.minute == 0 and now.second < 10:
             week_number = (now - datetime(now.year, 1, 1)).days // 7 + 1
             channel = client.get_channel(CHANNEL_ID)
             if channel is not None:
