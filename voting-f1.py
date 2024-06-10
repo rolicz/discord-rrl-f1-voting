@@ -237,11 +237,11 @@ async def daily_task():
                 logging.warning("Failed to post new voting, channel not found.")
 
         # send reminder message one hour before voting closes per pm
-        if now.hour == VOTING_CLOSED_HOUR - 1 and now.minute == 0:
+        if now.hour == VOTING_CLOSED_HOUR - 1 and now.minute == 0 and now.second < 10:
             await send_private_message_voting_reminder()
 
         # generate daily chart with votings
-        if now.hour == VOTING_CLOSED_HOUR and now.minute == 0:
+        if now.hour == VOTING_CLOSED_HOUR and now.minute == 0 and now.second < 10:
             await count_reactions_and_generate_charts()
 
         await asyncio.sleep(55)
