@@ -157,7 +157,7 @@ async def on_message(message):
         logging.info(f"received {message.content} from {message.author}")
         try:
             week_number = int(message.content.split()[1])
-            await post_weekdays(message.channel, week_number)
+            await post_new_voting(message.channel, week_number)
             save_message_ids()
         except ValueError:
             await message.channel.send('Invalid week number format. Please use "KW [number]".')
@@ -182,7 +182,7 @@ async def on_disconnect():
     logging.warning('Bot disconnected')
 
 
-async def post_weekdays(channel, week_number):
+async def post_new_voting(channel, week_number):
     global message_ids
     message_ids.clear()
     current_year = datetime.now().year
@@ -226,6 +226,15 @@ async def daily_task():
     await client.wait_until_ready()
     while not client.is_closed():
         now = datetime.now()
+
+        # start new voting every sunday evening
+        if now.weekday() == 6 and now.hour == 22 and now.minute == 0:
+            week_number = (now - datetime(now.year, 1, 1)).days // 7 + 1
+            channel = client.get_channel(CHANNEL_ID)
+            if channel is not None:
+                await post_new_voting(channel, week_number)
+            else:
+                logging.warning("Failed to post new voting, channel not found.")
 
         # send reminder message one hour before voting closes per pm
         if now.hour == VOTING_CLOSED_HOUR - 1 and now.minute == 0:
