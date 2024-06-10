@@ -14,6 +14,21 @@ import os
 import atexit
 import signal
 
+racers = {
+    "jisifus"       : "Arthur",
+    "pjgangster"    : "Peter",
+    "nynedine"      : "Kili",
+    "shevve"        : "Steve",
+    "der.geraet"    : "Simon",
+    "jani0166"      : "Jan",
+    "vsares"        : "Massl",
+    "thedohn"       : "Edon",
+    "flocz"         : "Flo",
+    "rolicz"        : "Roli",
+    "eisidrive"     : "Eisi",
+    "lukas6662"     : "Ropi",
+    "kleschmabilla" : "Franzi"
+}
 
 parser = argparse.ArgumentParser(description='Discord Bot for F1 RRL Voting')
 parser.add_argument("-d", "--debug", action=argparse.BooleanOptionalAction)
@@ -49,7 +64,7 @@ logging.info(f"role_id   : {ROLE_ID}")
 
 #EMOJI_TIMESLOTS = {'🕕': '18:00', '🕖': '19:00', '🕗': '20:00'} 
 EMOJI_TIMESLOTS = {'6️⃣': '18:00', '7️⃣': '19:00', '8️⃣': '20:00'} 
-
+EMOJI_NOT_AVAILABLE = ['👎']
     
 intents = discord.Intents.default()
 intents.message_content = True
@@ -131,6 +146,7 @@ async def on_message(message):
         try:
             week_number = int(message.content.split()[1])
             await post_weekdays(message.channel, week_number)
+            save_message_ids()
         except ValueError:
             await message.channel.send('Invalid week number format. Please use "KW [number]".')
     elif message.content.lower() == 'start':
@@ -227,22 +243,44 @@ async def count_reactions_and_generate_charts():
             return
 
         reaction_counts = defaultdict(lambda: defaultdict(list))
+        not_available_users = []
         for reaction in msg.reactions:
             if str(reaction.emoji) in EMOJI_TIMESLOTS:
                 async for user in reaction.users():
                     if user != client.user:
                         reaction_counts[today_name_german][EMOJI_TIMESLOTS[str(reaction.emoji)]].append(user.name)
+            if str(reaction.emoji) in EMOJI_NOT_AVAILABLE:
+                async for user in reaction.users():
+                    if user != client.user and user not in not_available_users:
+                        not_available_users.append(user.name)
 
-        generate_barchart(today_name_german, reaction_counts)
+        generate_barchart(today_name_german, reaction_counts, not_available_users)
 
-def generate_barchart(day_name, reaction_counts):
+
+def getUserRealName(user):
+    if user in racers:
+        return racers[user]
+    else:
+        return user
+
+def getUsersNotVoted(voted):
+    not_voted = []
+    for racer in racers.keys():
+        if racer not in voted:
+            not_voted.append(racer)
+    return not_voted
+
+
+def generate_barchart(day_name, reaction_counts, not_available_users):
+    logging.info(f"generate chart for {day_name}")
+    logging.info(f"not available: {not_available_users}")
     timeslots = list(EMOJI_TIMESLOTS.values())
     user_counts = {timeslot: len(reaction_counts[day_name][timeslot]) for timeslot in timeslots}
     max_count = max(user_counts.values()) if user_counts else 1
 
     # Create bar chart image using Pillow
     bar_spacing = 10
-    width = len(timeslots * 100) + bar_spacing
+    width = (2 + len(timeslots)) * 100 + bar_spacing
     height = max_count * 30 + 100
     bar_width = 90
     block_height = 25 # Height of each user block
@@ -252,6 +290,7 @@ def generate_barchart(day_name, reaction_counts):
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
 
+    voted = []
     for i, timeslot in enumerate(timeslots):
         users = reaction_counts[day_name][timeslot]
         for j, user in enumerate(users):
@@ -264,10 +303,37 @@ def generate_barchart(day_name, reaction_counts):
                 draw.rectangle([x1, y1, x2, y2], fill=(0, 153, 0))
             else:
                 draw.rectangle([x1, y1, x2, y2], fill=(204, 0, 0))
-            draw.text((x1 + 5, y1 + 10), user, fill='white', font=font)
+            voted.append(user)
+            realname = getUserRealName(user)
+            draw.text((x1 + 5, y1 + 10), realname, fill='white', font=font)
 
         # Draw the label for the timeslot
         draw.text((i * (bar_width + bar_spacing) + bar_spacing + 5, height - 20), timeslot, fill='black', font=font)
+    
+    i = len(timeslots)
+    draw.text((i * (bar_width + bar_spacing) + bar_spacing + 5, height - 20), "Nicht verfügbar", fill='black', font=font)
+    for j, user in enumerate(not_available_users):
+        x1 = i * (bar_width + bar_spacing) + bar_spacing
+        y1 = height - (j + 1) * (block_height + vertical_spacing) - 30
+        x2 = x1 + bar_width
+        y2 = y1 + block_height
+        draw.rectangle([x1, y1, x2, y2], fill=(80, 80, 80))
+        voted.append(user)
+        realname = getUserRealName(user)
+        draw.text((x1 + 5, y1 + 10), realname, fill='white', font=font)
+
+
+    i = len(timeslots) + 1
+    draw.text((i * (bar_width + bar_spacing) + bar_spacing + 5, height - 20), "Nicht gevoted", fill='black', font=font)
+    not_voted = getUsersNotVoted(voted)
+    for j, user in enumerate(not_voted):
+        x1 = i * (bar_width + bar_spacing) + bar_spacing
+        y1 = height - (j + 1) * (block_height + vertical_spacing) - 30
+        x2 = x1 + bar_width
+        y2 = y1 + block_height
+        draw.rectangle([x1, y1, x2, y2], fill=(0, 0, 200))
+        realname = getUserRealName(user)
+        draw.text((x1 + 5, y1 + 10), realname, fill='white', font=font)
 
     draw.text((width // 2 - 50, 10), f'Slots für {day_name}', fill='black', font=font)
     image_path = f'{day_name}.png'
