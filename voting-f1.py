@@ -50,10 +50,24 @@ parser.add_argument("-r", "--role-id", dest="role_id", required=True, type=int)
 parser.add_argument("-m", "--min-num-racers", dest="min_num_racers", required=True, type=int)
 args = parser.parse_args(sys.argv[1:])
 
-if args.debug != None and args.debug is True:
-    logging.basicConfig(level=logging.DEBUG)
-else:
-    logging.basicConfig(level=logging.INFO)
+class LoggerGen:
+    @staticmethod
+    def gen_logger(debug=False):
+        logger = logging.getLogger()
+        file_handler = logging.FileHandler(filename='./output.log', mode='w')
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%m/%d/%Y %H:%M:%S %p')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        if debug:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.INFO)
+        return logger
+    
+debug = False
+if args.debug is not None and args.debug is True:
+    debug = True
+logger = LoggerGen.gen_logger(debug)
 
 
 DIRECTORY = 'message_ids_storage'
@@ -66,7 +80,7 @@ CHANNEL_ID = args.channel_id
 ROLE_ID = args.role_id
 
 logging.info(f"min racers: {MIN_NUM_RACERS}")
-logging.info(f"token     : {TOKEN}")
+# logging.info(f"token     : {TOKEN}")
 logging.info(f"guild_id  : {GUILD_ID}")
 logging.info(f"channel_id: {CHANNEL_ID}")
 logging.info(f"role_id   : {ROLE_ID}")
@@ -226,6 +240,7 @@ async def on_disconnect():
 
 
 async def post_new_voting(channel, week_number):
+    logging.info(f"Create new voting for week {week_number}")
     global message_ids
     message_ids.clear()
     current_year = datetime.now().year
@@ -359,6 +374,7 @@ def getUserRealName(user):
 
 def generate_barchart(day_name, reaction_counts, not_available_users, available_users):
     logging.info(f"generate chart for {day_name}")
+    logging.info(f"available: {available_users}")
     logging.info(f"not available: {not_available_users}")
     timeslots = list(EMOJI_TIMESLOTS.values())
     user_counts = {timeslot: len(reaction_counts[day_name][timeslot]) for timeslot in timeslots}
