@@ -109,6 +109,7 @@ client = discord.Client(intents=intents)
 
 # Dictionary to hold message IDs and reaction counts
 message_ids = {}
+prev_chart_id = None
 
 def save_message_ids():
     if message_ids is None or message_ids == {}:
@@ -116,7 +117,7 @@ def save_message_ids():
         return
     current_date = datetime.now().strftime("%Y-%m-%d_%H%M")
     filename = os.path.join(DIRECTORY, f'message_ids_{current_date}.json')
-    logging.info(f"store to file {filename}")
+    logging.info(f"store message ids to file {filename}")
     with open(filename, 'w') as file:
         file.write(json.dumps(message_ids, indent=4))
 
@@ -128,11 +129,38 @@ def load_message_ids():
     latest_file =""
     try:
         latest_file = max(files, key=lambda f: datetime.strptime(pattern.match(f).group(1), "%Y-%m-%d_%H%M"))
-
     except Exception as e:
         logging.warning(e)
+        return 
+    logging.debug(f"latest file: {latest_file}")
+    filepath = os.path.join(DIRECTORY, latest_file)
+    if os.path.exists(filepath):
+        logging.info(f"load from {filepath}")
+        with open(filepath, 'r') as file:
+            return json.load(file)
+    
+def save_prev_chart_id():
+    if prev_chart_id is None:
+        logging.info(f"prev_chart_id is None: nothing saved")
         return
-    logging.info(f"latest file: {latest_file}")
+    current_date = datetime.now().strftime("%Y-%m-%d_%H%M")
+    filename = os.path.join(DIRECTORY, f'prev_chart_id_{current_date}.json')
+    logging.info(f"store previous chart ids to file {filename}")
+    with open(filename, 'w') as file:
+        file.write(json.dumps(prev_chart_id, indent=4))
+
+def load_prev_chart_id():
+    pattern = re.compile(r'prev_chart_id_(\d{4}-\d{2}-\d{2}_\d{4}).json')
+    files = [f for f in os.listdir(DIRECTORY) if pattern.match(f)]
+    if not files:
+        return None
+    latest_file =""
+    try:
+        latest_file = max(files, key=lambda f: datetime.strptime(pattern.match(f).group(1), "%Y-%m-%d_%H%M"))
+    except Exception as e:
+        logging.warning(e)
+        return None
+    logging.debug(f"latest file: {latest_file}")
     filepath = os.path.join(DIRECTORY, latest_file)
     if os.path.exists(filepath):
         logging.info(f"load from {filepath}")
@@ -142,6 +170,8 @@ def load_message_ids():
 try:
     message_ids = load_message_ids()
     logging.info(f"loaded msg ids: {message_ids}")
+    prev_chart_id = load_prev_chart_id()
+    logging.info(f"loaded prev_chart_id: {prev_chart_id}")
 except Exception as e:
     pass
 
@@ -149,6 +179,7 @@ except Exception as e:
 def exit_handler():
     logging.info("Saving message_ids before exiting...")
     save_message_ids()
+    save_prev_chart_id()
 
 atexit.register(exit_handler)
 
@@ -224,9 +255,12 @@ async def on_message(message):
         await send_private_message_voting_reminder()
     elif message.content.startswith('debug-store-msg-ids'):
         save_message_ids()
+        save_prev_chart_id()
     elif message.content.startswith('debug-load-msg-ids'):
         message_ids = load_message_ids()
         logging.info(f"loaded msg ids: {message_ids}")
+        prev_chart_id = load_prev_chart_id()
+        logging.info(f"loaded prev_chart_id: {prev_chart_id}")
 
 
 @client.event
@@ -362,7 +396,7 @@ async def count_reactions_and_generate_charts():
         logging.warning("Failed to count reactions for today.")
         return
 
-    generate_barchart(today_name_german, reaction_counts, not_available_users, available_users)
+    await generate_barchart(today_name_german, reaction_counts, not_available_users, available_users)
 
 
 def getUserRealName(user):
@@ -372,7 +406,8 @@ def getUserRealName(user):
         return user
 
 
-def generate_barchart(day_name, reaction_counts, not_available_users, available_users):
+async def generate_barchart(day_name, reaction_counts, not_available_users, available_users):
+    global prev_chart_id
     logging.info(f"generate chart for {day_name}")
     logging.info(f"available: {available_users}")
     logging.info(f"not available: {not_available_users}")
@@ -441,7 +476,21 @@ def generate_barchart(day_name, reaction_counts, not_available_users, available_
 
     channel = client.get_channel(CHANNEL_ID)
     if channel is not None:
-        asyncio.run_coroutine_threadsafe(channel.send(file=discord.File(f'{day_name}.png')), client.loop)
+        if prev_chart_id is not None:
+            try:
+                prev_chart_message = await channel.fetch_message(prev_chart_id)
+                logging.info(f"delete previous chart {prev_chart_id}")
+                await prev_chart_message.delete()
+            except Exception as e:
+                logging.warning(f"could not delete previous chart {prev_chart_id} ({e})")
+        prev_chart_id = None
+        try:
+            msg = await channel.send(file=discord.File(f'{day_name}.png'))
+            prev_chart_id = msg.id
+            logging.info(f"sent chart with id {prev_chart_id}")
+        except Exception as e:
+            logging.warning(f"could not send chart ({e})")
+
         os.remove(image_path)
     else:
         print("Failed to send barchart image, channel not found.")
