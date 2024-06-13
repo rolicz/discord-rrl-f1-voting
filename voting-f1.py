@@ -6,7 +6,8 @@ import sys
 import argparse
 import re
 import discord
-from datetime import datetime, timedelta
+from discord.ext import tasks
+from datetime import datetime, timedelta, time
 from collections import defaultdict
 import asyncio
 from PIL import Image, ImageDraw, ImageFont
@@ -73,7 +74,15 @@ logging.info(f"role_id   : {ROLE_ID}")
 
 EMOJI_TIMESLOTS = {'6️⃣': '18:00', '7️⃣': '19:00', '8️⃣': '20:00'}
 EMOJI_NOT_AVAILABLE = ['👎']
+
+TIMEZONE = datetime.now().astimezone().tzinfo
 VOTING_CLOSED_HOUR = 15
+VOTING_UPDATE_DAY = 6  # Sunday
+
+VOTING_UPDATE_TIME = time(22, 0, tzinfo=TIMEZONE)
+VOTING_REMINDER_TIME = time(VOTING_CLOSED_HOUR - 1, 0, tzinfo=TIMEZONE)
+VOTING_EVALUATION_TIME = time(VOTING_CLOSED_HOUR, 0, tzinfo=TIMEZONE)
+
 VOTING_REMINDER_IMAGE_PATH = 'assets/voting_reminder.png'
 
 intents = discord.Intents.default()
@@ -139,10 +148,44 @@ signal.signal(signal.SIGINT, signal_handler)  # Handle Ctrl+C
 signal.signal(signal.SIGTERM, signal_handler)  # Handle termination
 
 
+@tasks.loop(time=VOTING_UPDATE_TIME)
+async def weekly_new_voting_task():
+    now = datetime.now()
+
+    if now.weekday() != VOTING_UPDATE_DAY:
+        next_update = (VOTING_UPDATE_DAY - now.weekday()) % 7
+        logging.info(f"Skipping weekly voting update, next update in {next_update} days.")
+        return
+
+    week_number = (now - datetime(now.year, 1, 1)).days // 7 + 1
+    channel = client.get_channel(CHANNEL_ID)
+    if channel is not None:
+        await post_new_voting(channel, week_number)
+    else:
+        logging.warning("Failed to post new voting, channel not found.")
+
+
+@tasks.loop(time=VOTING_REMINDER_TIME)
+async def daily_voting_reminder_task():
+    await send_private_message_voting_reminder()
+
+
+@tasks.loop(time=VOTING_EVALUATION_TIME)
+async def daily_voting_evaluation_task():
+    await count_reactions_and_generate_charts()
+
+
 @client.event
 async def on_ready():
     logging.info(f'We have logged in as {client.user}')
-    await client.loop.create_task(daily_task())
+
+    # start all the scheduled tasks
+    logging.info(f"Starting voting poll task. Runs everyday at {VOTING_UPDATE_TIME}")
+    weekly_new_voting_task.start()
+    logging.info(f"Starting voting reminder task. Runs everyday at {VOTING_REMINDER_TIME}")
+    daily_voting_reminder_task.start()
+    logging.info(f"Starting voting evaluation task. Runs everyday at {VOTING_EVALUATION_TIME}")
+    daily_voting_evaluation_task.start()
 
 
 @client.event
@@ -220,48 +263,23 @@ async def post_new_voting(channel, week_number):
         day_name = weekdays[day_date.weekday()]
         msg = await channel.send(f'{day_name} {day_date.strftime("%d.%m.")}')
         message_ids[day_name] = msg.id
-
-    
-async def daily_task():
-    await client.wait_until_ready()
-    while not client.is_closed():
-        now = datetime.now()
-
-        # start new voting every sunday evening
-        if now.weekday() == 6 and now.hour == 22 and now.minute == 0 and now.second < 10:
-            week_number = (now - datetime(now.year, 1, 1)).days // 7 + 1
-            channel = client.get_channel(CHANNEL_ID)
-            if channel is not None:
-                await post_new_voting(channel, week_number)
-            else:
-                logging.warning("Failed to post new voting, channel not found.")
-
-        # send reminder message one hour before voting closes per pm
-        if now.hour == VOTING_CLOSED_HOUR - 1 and now.minute == 0 and now.second < 10:
-            await send_private_message_voting_reminder()
-
-        # generate daily chart with votings
-        if now.hour == VOTING_CLOSED_HOUR and now.minute == 0 and now.second < 10:
-            await count_reactions_and_generate_charts()
-
-        await asyncio.sleep(55)
     
 
 async def count_reactions_for_day(today_name_german):
     channel = client.get_channel(CHANNEL_ID)
     if channel is None:
-        print(f"Failed to get channel with ID {CHANNEL_ID}")
+        logging.warning(f"Failed to get channel with ID {CHANNEL_ID}")
         return None, None, None
 
     if today_name_german not in message_ids:
-        print(f"Message ID for {today_name_german} not found.")
+        logging.warning(f"Message ID for {today_name_german} not found.")
         return None, None, None
 
     msg_id = message_ids[today_name_german]
     try:
         msg = await channel.fetch_message(msg_id)
     except discord.NotFound:
-        print(f"Message ID {msg_id} not found.")
+        logging.warning(f"Message ID {msg_id} not found.")
         return None, None, None
 
     reaction_counts = defaultdict(lambda: defaultdict(list))
@@ -284,7 +302,7 @@ async def count_reactions_for_day(today_name_german):
 def get_not_voted_users(not_available_users, available_users):
     channel = client.get_channel(CHANNEL_ID)
     if channel is None:
-        print(f"Failed to get channel with ID {CHANNEL_ID}")
+        logging.warning(f"Failed to get channel with ID {CHANNEL_ID}")
         return []
 
     # Get all users who have not voted yet
@@ -306,6 +324,7 @@ def get_day_of_week():
 
 
 async def send_private_message_voting_reminder():
+    logging.info("Sending voting reminder...")
     today_name_german = get_day_of_week()
     reaction_counts, not_available_users, available_users = await count_reactions_for_day(today_name_german)
     if reaction_counts is None or not_available_users is None or available_users is None:
