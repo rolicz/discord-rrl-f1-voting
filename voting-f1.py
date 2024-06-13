@@ -217,6 +217,7 @@ async def daily_voting_reminder_task():
 
 @tasks.loop(time=VOTING_EVALUATION_TIME)
 async def daily_voting_evaluation_task():
+    await delete_previous_chart()
     await count_reactions_and_generate_charts()
 
 
@@ -250,6 +251,7 @@ async def on_message(message):
         except ValueError:
             await message.channel.send('Invalid week number format. Please use "KW [number]".')
     elif message.content.lower() == 'start':
+        await delete_previous_chart()
         await count_reactions_and_generate_charts()
     elif message.content.lower() == 'send-reminder':
         await send_private_message_voting_reminder()
@@ -387,6 +389,18 @@ async def send_private_message_voting_reminder():
         await user.send(f"Bro scherts dich abstimmen?")
         await user.send(file=discord.File(VOTING_REMINDER_IMAGE_PATH))
 
+async def delete_previous_chart():
+    global prev_chart_id
+    channel = client.get_channel(CHANNEL_ID)
+    if channel is not None:
+        if prev_chart_id is not None:
+            try:
+                prev_chart_message = await channel.fetch_message(prev_chart_id)
+                logging.info(f"delete previous chart {prev_chart_id}")
+                await prev_chart_message.delete()
+                prev_chart_id = None
+            except Exception as e:
+                logging.warning(f"could not delete previous chart {prev_chart_id} ({e})")
 
 async def count_reactions_and_generate_charts():
     logging.info("Counting reactions and generating charts...")
@@ -476,15 +490,9 @@ async def generate_barchart(day_name, reaction_counts, not_available_users, avai
 
     channel = client.get_channel(CHANNEL_ID)
     if channel is not None:
-        if prev_chart_id is not None:
-            try:
-                prev_chart_message = await channel.fetch_message(prev_chart_id)
-                logging.info(f"delete previous chart {prev_chart_id}")
-                await prev_chart_message.delete()
-            except Exception as e:
-                logging.warning(f"could not delete previous chart {prev_chart_id} ({e})")
-        prev_chart_id = None
         try:
+            if prev_chart_id is not None:
+                logging.warning(f"create new chart but prev_chart_id is not None")
             msg = await channel.send(file=discord.File(f'{day_name}.png'))
             prev_chart_id = msg.id
             logging.info(f"sent chart with id {prev_chart_id}")
