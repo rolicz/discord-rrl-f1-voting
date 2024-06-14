@@ -427,7 +427,13 @@ async def generate_barchart(day_name, reaction_counts, not_available_users, avai
     logging.info(f"not available: {not_available_users}")
     timeslots = list(EMOJI_TIMESLOTS.values())
     user_counts = {timeslot: len(reaction_counts[day_name][timeslot]) for timeslot in timeslots}
+    not_voted = get_not_voted_users(not_available_users, available_users)
+    
     max_count = max(user_counts.values()) if user_counts else 1
+    if len(not_available_users) > max_count:
+        max_count = len(not_available_users)
+    if len(not_voted) > max_count:
+        max_count = len(not_voted)
 
     # Create bar chart image using Pillow
     bar_spacing = 10
@@ -473,7 +479,6 @@ async def generate_barchart(day_name, reaction_counts, not_available_users, avai
 
     i = len(timeslots) + 1
     draw.text((i * (bar_width + bar_spacing) + bar_spacing + 5, height - 20), "Nicht gevoted", fill='black', font=font)
-    not_voted = get_not_voted_users(not_available_users, available_users)
     not_voted_nicknames = [user.name for user in not_voted]
     for j, user in enumerate(not_voted_nicknames):
         x1 = i * (bar_width + bar_spacing) + bar_spacing
