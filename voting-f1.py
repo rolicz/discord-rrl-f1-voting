@@ -202,7 +202,9 @@ async def weekly_new_voting_task():
         logging.info(f"Skipping weekly voting update, next update in {next_update} days.")
         return
 
-    week_number = (now - datetime(now.year, 1, 1)).days // 7 + 2
+    monday = now + timedelta(days=1)
+    week_number = monday.isocalendar().week
+
     channel = client.get_channel(CHANNEL_ID)
     if channel is not None:
         await post_new_voting(channel, week_number)
