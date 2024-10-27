@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 import atexit
 import signal
+import zoneinfo
 
 RACERS = {
     "jisifus"       : "Arthur",
@@ -89,7 +90,7 @@ logging.info(f"role_id   : {ROLE_ID}")
 EMOJI_TIMESLOTS = {'6️⃣': '18:00', '7️⃣': '19:00', '8️⃣': '20:00'}
 EMOJI_NOT_AVAILABLE = ['👎']
 
-TIMEZONE = datetime.now().astimezone().tzinfo
+TIMEZONE = zoneinfo.ZoneInfo("Europe/Vienna")
 VOTING_CLOSED_HOUR = 15
 VOTING_UPDATE_DAY = 6  # Sunday
 
@@ -387,9 +388,13 @@ async def send_private_message_voting_reminder():
     users = get_not_voted_users(not_available_users, available_users)
 
     for user in users:
-        logging.info(f"Sending vote reminder to {user.name}")
-        await user.send(f"Bro scherts dich abstimmen?")
-        await user.send(file=discord.File(VOTING_REMINDER_IMAGE_PATH))
+        try:
+            logging.info(f"Sending vote reminder to {user.name}")
+            await user.send(f"Bro scherts dich abstimmen?")
+            await user.send(file=discord.File(VOTING_REMINDER_IMAGE_PATH))
+        except Exception as e:
+            logging.warning(f"Could not send vote reminder to {user.name}")
+
 
 async def delete_previous_chart():
     global prev_chart_id
@@ -511,4 +516,5 @@ async def generate_barchart(day_name, reaction_counts, not_available_users, avai
         print("Failed to send barchart image, channel not found.")
 
 
+logging.info(f"startup at {datetime.now(TIMEZONE)}")
 client.run(TOKEN)
