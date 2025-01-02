@@ -17,19 +17,19 @@ import signal
 import zoneinfo
 
 RACERS = {
-    "jisifus"       : "Arthur",
-    "pjgangster"    : "Peter",
-    "nynedine"      : "Kili",
-    "shevve"        : "Steve",
-    "der.geraet"    : "Simon",
-    "jani0166"      : "Jan",
-    "vsares"        : "Massl",
-    "thedohn"       : "Edon",
-    "flocz"         : "Flo",
-    "rolicz"        : "Roli",
-    "eisidrive"     : "Eisi",
-    "lukas6662"     : "Ropi",
-    "kleschmabilla" : "Franzi"
+    "jisifus"           : "Arthur",
+    "pjgangster"        : "Peter",
+    "nynedine"          : "Kili",
+    "shevve"            : "Steve",
+    "metschamonoqueem"  : "Simon",
+    "jani0166"          : "Jan",
+    "vsares"            : "Massl",
+    "thedohn"           : "Edon",
+    "flocz"             : "Flo",
+    "rolicz"            : "Roli",
+    "eisidrive"         : "Eisi",
+    "lukas6662"         : "Ropi",
+    "kleschmabilla"     : "Franzi"
 }
 
 DAY_TRANSLATIONS = {
@@ -87,7 +87,7 @@ logging.info(f"channel_id: {CHANNEL_ID}")
 logging.info(f"role_id   : {ROLE_ID}")
 
 
-EMOJI_TIMESLOTS = {'6️⃣': '18:00', '7️⃣': '19:00', '8️⃣': '20:00'}
+EMOJI_TIMESLOTS = {'6️⃣': '18:00', '7️⃣': '19:00', '8️⃣': '20:00', '9️⃣': '20:30'}
 EMOJI_NOT_AVAILABLE = ['👎']
 
 TIMEZONE = zoneinfo.ZoneInfo("Europe/Vienna")
@@ -208,6 +208,7 @@ async def weekly_new_voting_task():
 
     channel = client.get_channel(CHANNEL_ID)
     if channel is not None:
+        logging.info(f"post new voting at {now.isoformat()}")
         await post_new_voting(channel, week_number)
     else:
         logging.warning("Failed to post new voting, channel not found.")
@@ -279,11 +280,12 @@ async def on_disconnect():
 
 
 async def post_new_voting(channel, week_number):
-    logging.info(f"Create new voting for week {week_number}")
+    now = datetime.now()
     global message_ids
     message_ids.clear()
-    current_year = datetime.now().year
+    current_year = now.year
     first_day_of_year = datetime(current_year, 1, 1)
+    logging.info(f"Create new voting for week {week_number} at {now}, year {current_year}, first day of the year: {first_day_of_year}")
     if first_day_of_year.weekday() > 3:
         first_day_of_year = first_day_of_year + timedelta(7 - first_day_of_year.weekday())
     else:
