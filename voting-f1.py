@@ -29,7 +29,9 @@ RACERS = {
     "rolicz"            : "Roli",
     "eisidrive"         : "Eisi",
     "lukas6662"         : "Ropi",
-    "kleschmabilla"     : "Franzi"
+    #"kleschmabilla"     : "Franzi",
+    "msebastian"        : "Sebastian",
+    "kaizerkarl"        : "Karli",
 }
 
 DAY_TRANSLATIONS = {
@@ -80,15 +82,16 @@ GUILD_ID = args.guild_id
 CHANNEL_ID = args.channel_id 
 ROLE_ID = args.role_id
 
-logging.info(f"min racers: {MIN_NUM_RACERS}")
-# logging.info(f"token     : {TOKEN}")
-logging.info(f"guild_id  : {GUILD_ID}")
-logging.info(f"channel_id: {CHANNEL_ID}")
-logging.info(f"role_id   : {ROLE_ID}")
+logging.info(f"min racers     : {MIN_NUM_RACERS}")
+# logging.info(f"token          : {TOKEN}")
+logging.info(f"guild_id       : {GUILD_ID}")
+logging.info(f"channel_id     : {CHANNEL_ID}")
+logging.info(f"role_id        : {ROLE_ID}")
 
 
-EMOJI_TIMESLOTS = {'6️⃣': '18:00', '7️⃣': '19:00', '8️⃣': '20:00', '9️⃣': '20:30'}
+EMOJI_TIMESLOTS = {'6️⃣': '18:00', '7️⃣': '19:00', '8️⃣': '20:00', '🌃': '20:30'}
 EMOJI_NOT_AVAILABLE = ['👎']
+logging.info(f"EMOJI_TIMESLOTS: {EMOJI_TIMESLOTS}")
 
 TIMEZONE = zoneinfo.ZoneInfo("Europe/Vienna")
 VOTING_CLOSED_HOUR = 15
@@ -236,6 +239,11 @@ async def on_ready():
     daily_voting_reminder_task.start()
     logging.info(f"Starting voting evaluation task. Runs everyday at {VOTING_EVALUATION_TIME}")
     daily_voting_evaluation_task.start()
+    # today_name_german = get_day_of_week()
+    # reaction_counts, not_available_users, available_users = await count_reactions_for_day(today_name_german)
+    # logging.info(f"reactions: {reaction_counts}")
+    # logging.info(f"not available: {not_available_users}")
+    # logging.info(f"available: {available_users}")
 
 
 @client.event
